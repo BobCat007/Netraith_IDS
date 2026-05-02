@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Netraith IDS</title>
+
+<script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    background: #020202;
+    color: #00ff9c;
+    font-family: monospace;
+    margin: 0;
+}
+
+/* 🔥 BANNER */
+#banner {
+    text-align: center;
+    padding: 10px;
+    border-bottom: 1px solid #00ff9c;
+    box-shadow: 0 0 15px #00ff9c;
+}
+
+#banner pre {
+    margin: 0;
+    font-size: 12px;
+    color: #00ff9c;
+    text-shadow: 0 0 8px #00ff9c;
+    animation: glow 2s infinite alternate;
+}
+
+@keyframes glow {
+    from { text-shadow: 0 0 5px #00ff9c; }
+    to   { text-shadow: 0 0 20px #00ff9c; }
+}
+
+/* GRID */
+.grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: 180px 300px 250px;
+    gap: 10px;
+    padding: 10px;
+}
+
+/* PANELS */
+.panel {
+    border: 1px solid #00ff9c;
+    box-shadow: 0 0 12px #00ff9c;
+    padding: 10px;
+    background: rgba(0,0,0,0.8);
+}
+
+h3 {
+    margin: 0 0 10px 0;
+    text-shadow: 0 0 8px #00ff9c;
+}
+
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+th, td {
+    border: 1px solid #00ff9c;
+    padding: 4px;
+}
+
+/* TERMINAL */
+#terminal {
+    height: 120px;
+    overflow-y: auto;
+    font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="banner">
+<pre>
+███╗   ██╗███████╗████████╗██████╗  █████╗ ██╗████████╗██╗  ██╗
+████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██╔══██╗██║╚══██╔══╝██║  ██║
+██╔██╗ ██║█████╗     ██║   ██████╔╝███████║██║   ██║   ███████║
+██║╚██╗██║██╔══╝     ██║   ██╔══██╗██╔══██║██║   ██║   ██╔══██║
+██║ ╚████║███████╗   ██║   ██║  ██║██║  ██║██║   ██║   ██║  ██║
+╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝   ╚═╝   ╚═╝  ╚═╝
+
+        NETRAITH IDS - REAL-TIME THREAT HUNTER
+</pre>
+</div>
+
+<div class="grid">
+
+<div class="panel">
+<h3>> TERMINAL</h3>
+<div id="terminal"></div>
+</div>
+
+<div class="panel">
+<h3>> SYSTEM</h3>
+<p>Total Attacks: <span id="total">0</span></p>
+<p>Unique Attackers: <span id="attackers">0</span></p>
+</div>
+
+<div class="panel">
+<h3>> LIVE ATTACK FEED</h3>
+<table id="feed">
+<tr><th>Time</th><th>IP</th><th>Attack</th></tr>
+</table>
+</div>
+
+<div class="panel">
+<h3>> THREAT GRAPH</h3>
+<canvas id="chart"></canvas>
+</div>
+
+<div class="panel">
+<h3>> TOP ATTACKERS</h3>
+<div id="top">No data</div>
+</div>
+
+</div>
+
+<script>
+const socket = io();
+
+/* GRAPH */
+const chart = new Chart(document.getElementById("chart"), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: "Threat Level",
+            data: [],
+            borderColor: "#00ff9c",
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true
+    }
+});
+
+/* UPDATE */
+socket.on("update", (data) => {
+
+    if (!data) return;
+
+    // SAFE VALUES
+    const total = data.total || 0;
+    const attackers = data.attackers || 0;
+    const logs = data.logs || [];
+    const top = data.top || {};
+
+    // STATS
+    document.getElementById("total").innerText = total;
+    document.getElementById("attackers").innerText = attackers;
+
+    // TABLE
+    let table = `
+    <tr>
+    <th>Time</th><th>IP</th><th>Attack</th>
+    </tr>`;
+
+    logs.forEach(l => {
+        table += `<tr>
+        <td>${l.Time || "-"}</td>
+        <td>${l["Source IP"] || "-"}</td>
+        <td>${l.Attack || "-"}</td>
+        </tr>`;
+    });
+
+    document.getElementById("feed").innerHTML = table;
+
+    // TOP ATTACKERS
+    let topHTML = "";
+    for (let ip in top) {
+        topHTML += `${ip} → ${top[ip]}<br>`;
+    }
+    document.getElementById("top").innerHTML = topHTML || "No attackers";
+
+    // GRAPH
+    chart.data.labels.push("");
+    chart.data.datasets[0].data.push(total);
+
+    if (chart.data.labels.length > 20) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+    }
+
+    chart.update();
+
+    // TERMINAL
+    const terminal = document.getElementById("terminal");
+    terminal.innerHTML += `> Processed ${total} events<br>`;
+    terminal.scrollTop = terminal.scrollHeight;
+});
+</script>
+
+</body>
+</html>
